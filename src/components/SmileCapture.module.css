@@ -1,0 +1,52 @@
+.SmileCaptureSection {
+  width: 100%;
+  min-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.SmileCaptureText {
+  color: white;
+  font-size: 1.5rem;
+  height: 10vh;
+  text-align: center;
+}
+
+.SmileCaptureArticle {
+  width: 100%;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  background-color: red;
+}
+
+.SmileCaptureDiv {
+  width: 560px;
+  height: 420px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.SmileCaptureVideo,
+.SmileCaptureCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 560px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* .SmileCaptureCanvas {
+  opacity: 0;
+} */
+
+.SmileCaptureImage {
+  object-fit: cover;
+  width: 560px;
+  height: 420px;
+}
