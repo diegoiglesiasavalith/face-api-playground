@@ -1,3 +1,10 @@
+.section {
+  display: flex;
+  width: 100%;
+  justify-content: space-evenly;
+}
+
+/* Se requiere el position para que el video y el canvas se superpongan correctamente*/
 .container {
   position: relative;
   width: 560px;
@@ -21,4 +28,5 @@
   left: 0;
   width: 100%;
   height: 100%;
+  /* opacity: 0; */
 }

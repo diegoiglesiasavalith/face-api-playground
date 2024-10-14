@@ -5,6 +5,10 @@ import styles from "./AntiSpoofingComponent.module.css";
 // Variable para almacenar el ID del intervalo
 let intervalId: NodeJS.Timeout;
 
+// Correccion a la orientacion del rostro
+const correctFaceToTheLeft = 15;
+const correctFaceToTheRight = 15;
+
 const AntiSpoofingComponent = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -12,6 +16,7 @@ const AntiSpoofingComponent = () => {
   const [hasLookedLeft, setHasLookedLeft] = useState(false);
   const [hasLookedRight, setHasLookedRight] = useState(false);
   const [hasLookedCenter, setHasLookedCenter] = useState(false);
+  const [hasLookedCenterAgain, setHasLookedCenterAgain] = useState(false);
 
   useEffect(() => {
     const loadModels = async () => {
@@ -30,28 +35,45 @@ const AntiSpoofingComponent = () => {
     const leftEye = landmarks.getLeftEye();
     const rightEye = landmarks.getRightEye();
 
-    // Detectar si está mirando hacia la izquierda
-    if (!hasLookedLeft && nose[0].x + 15 > rightEye[3].x) {
-      setHasLookedLeft(true);
-      console.log("Mirada hacia la izquierda detectada");
-    }
-
-    // Detectar si está mirando hacia la derecha (solo si ya ha mirado a la izquierda)
-    if (hasLookedLeft && !hasLookedRight && nose[0].x - 15 < leftEye[0].x) {
-      setHasLookedRight(true);
-      console.log("Mirada hacia la derecha detectada");
-    }
-
-    // Detectar si está mirando hacia el centro (solo si ya ha mirado a la derecha)
+    // Detectar si está mirando hacia el centro primero
     if (
-      hasLookedLeft &&
-      hasLookedRight &&
       !hasLookedCenter &&
       nose[0].x > leftEye[3].x &&
       nose[0].x < rightEye[0].x
     ) {
       setHasLookedCenter(true);
-      console.log("Mirada hacia el centro detectada");
+      console.log("Mirada hacia el centro detectada (primer paso)");
+    }
+
+    // Detectar si está mirando hacia la izquierda (después de mirar al centro)
+    if (
+      hasLookedCenter &&
+      !hasLookedLeft &&
+      nose[0].x + correctFaceToTheLeft > rightEye[3].x
+    ) {
+      setHasLookedLeft(true);
+      console.log("Mirada hacia la izquierda detectada");
+    }
+
+    // Detectar si está mirando hacia la derecha (después de mirar a la izquierda)
+    if (
+      hasLookedLeft &&
+      !hasLookedRight &&
+      nose[0].x - correctFaceToTheRight < leftEye[0].x
+    ) {
+      setHasLookedRight(true);
+      console.log("Mirada hacia la derecha detectada");
+    }
+
+    // Detectar si está mirando hacia el centro nuevamente (después de mirar a la derecha)
+    if (
+      hasLookedRight &&
+      !hasLookedCenterAgain &&
+      nose[0].x > leftEye[3].x &&
+      nose[0].x < rightEye[0].x
+    ) {
+      setHasLookedCenterAgain(true);
+      console.log("Mirada hacia el centro detectada (último paso)");
     }
   };
 
@@ -110,37 +132,56 @@ const AntiSpoofingComponent = () => {
         }
       };
     }
-  }, [modelsLoaded, hasLookedLeft, hasLookedRight, hasLookedCenter]);
+  }, [
+    modelsLoaded,
+    hasLookedCenter,
+    hasLookedLeft,
+    hasLookedRight,
+    hasLookedCenterAgain,
+  ]);
 
   return (
-    <section>
-      <p style={{ color: "white" }}>
-        {modelsLoaded ? "Modelos cargados" : "Cargando modelos..."}
-      </p>
-      <p style={{ color: "white" }}>
-        {hasLookedLeft
-          ? "Mirada hacia la izquierda detectada"
-          : "Mira hacia la izquierda"}
-      </p>
-      <p style={{ color: "white" }}>
-        {hasLookedRight
-          ? "Mirada hacia la derecha detectada"
-          : hasLookedLeft
-          ? "Mira hacia la derecha"
-          : "..."}
-      </p>
-      <p style={{ color: "white" }}>
-        {hasLookedCenter
-          ? "Mirada hacia el centro detectada"
-          : hasLookedRight
-          ? "Mira hacia el centro"
-          : "..."}
-      </p>
-      <p style={{ color: "white" }}>
-        {hasLookedLeft && hasLookedRight && hasLookedCenter
-          ? "Secuencia completada correctamente"
-          : "Secuencia incompleta"}
-      </p>
+    <section className={styles.section}>
+      <article>
+        <p style={{ color: "white" }}>
+          {modelsLoaded ? "Modelos cargados" : "Cargando modelos..."}
+        </p>
+        <p style={{ color: "white" }}>
+          {hasLookedCenter
+            ? "Mirada hacia el centro detectada (primer paso)"
+            : "Cargando lanmarkers..."}
+        </p>
+        <p style={{ color: "white" }}>
+          {hasLookedLeft
+            ? "Mirada hacia la izquierda detectada (segundo paso)"
+            : hasLookedCenter
+            ? "Mira hacia la izquierda"
+            : "..."}
+        </p>
+        <p style={{ color: "white" }}>
+          {hasLookedRight
+            ? "Mirada hacia la derecha detectada (tercer paso)"
+            : hasLookedLeft
+            ? "Mira hacia la derecha"
+            : "..."}
+        </p>
+        <p style={{ color: "white" }}>
+          {hasLookedCenterAgain
+            ? "Mirada hacia el centro detectada (cuarto paso)"
+            : hasLookedRight
+            ? "Mira hacia el centro nuevamente"
+            : "..."}
+        </p>
+        <p style={{ color: "white" }}>
+          {hasLookedCenter &&
+          hasLookedLeft &&
+          hasLookedRight &&
+          hasLookedCenterAgain
+            ? "Secuencia completada correctamente"
+            : "Secuencia incompleta"}
+        </p>
+      </article>
+
       <div className={styles.container}>
         <video
           className={styles.video}
