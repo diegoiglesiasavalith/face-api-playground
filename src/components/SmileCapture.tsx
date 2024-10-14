@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
 import styles from "./SmileCapture.module.css";
@@ -6,26 +8,26 @@ import Image from "next/image";
 const SmileCapture: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isSmiling, setIsSmiling] = useState(false);
   const [imageData, setImageData] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadModels = async () => {
       const MODEL_URL = "/models";
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      await faceapi.nets.mtcnn.loadFromUri(MODEL_URL);
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
       await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
-      setIsModelLoaded(true);
+      setIsLoading(false);
     };
     loadModels();
   }, []);
 
   useEffect(() => {
-    if (isModelLoaded) {
+    if (!isLoading) {
       startVideo();
     }
-  }, [isModelLoaded]);
+  }, [isLoading]);
 
   const startVideo = () => {
     navigator.mediaDevices
@@ -48,10 +50,7 @@ const SmileCapture: React.FC = () => {
 
       setInterval(async () => {
         const detections = await faceapi
-          .detectAllFaces(
-            videoRef.current!,
-            new faceapi.TinyFaceDetectorOptions()
-          )
+          .detectAllFaces(videoRef.current!, new faceapi.MtcnnOptions())
           .withFaceLandmarks()
           .withFaceExpressions();
 
@@ -75,19 +74,18 @@ const SmileCapture: React.FC = () => {
         } else {
           setIsSmiling(false);
         }
-      }, 100);
+      }, 500);
     }
   };
 
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {
-      const context = canvasRef.current.getContext("2d");
+      const context = canvasRef.current.getContext("2d", {
+        willReadFrequently: true,
+      });
       if (context) {
-        // Establecer el tamaño del lienzo para que coincida con el contenedor
         canvasRef.current.width = 560;
         canvasRef.current.height = 420;
-
-        // Dibujar el video en el lienzo ajustando el tamaño
         context.drawImage(
           videoRef.current,
           0,
@@ -105,6 +103,16 @@ const SmileCapture: React.FC = () => {
       }
     }
   };
+
+  if (isLoading) {
+    return (
+      <main className={styles.SmileCaptureMainLoader}>
+        <section className={styles.SmileCaptureSectionLoader}>
+          <p>cargando...</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <section className={styles.SmileCaptureSection}>
@@ -134,7 +142,7 @@ const SmileCapture: React.FC = () => {
             src={imageData}
             alt="Logo"
             className={styles.SmileCaptureImage}
-            width={420}
+            width={560}
             height={420}
           />
         )}
