@@ -115,6 +115,16 @@ const AntiSpoofingComponent = () => {
     }
   };
 
+  // Función para manejar el reinicio del proceso
+  const handleReset = () => {
+    setHasLookedLeft(false);
+    setHasLookedRight(false);
+    setHasLookedCenter(false);
+    setHasLookedCenterAgain(false);
+    setHasSmiled(false);
+    setCapturedImage(""); // Limpiar la imagen capturada
+  };
+
   useEffect(() => {
     if (modelsLoaded && videoRef.current) {
       const video = videoRef.current;
@@ -233,13 +243,30 @@ const AntiSpoofingComponent = () => {
         </p>
 
         {capturedImage !== "" && (
-          <div>
-            <Image
-              src={capturedImage}
-              alt="Imagen capturada"
-              width={420}
-              height={315}
-            />
+          <div className={styles.imageContainer}>
+            {capturedImage.length > 10 ? (
+              <Image
+                src={capturedImage}
+                alt="Imagen capturada"
+                width={420}
+                height={315}
+              />
+            ) : (
+              <div className={styles.imageContainerError}>
+                <p>Error al cargar la imagen</p>
+                <p>Por favor reinicie la captura</p>
+              </div>
+            )}
+
+            {/* Botón para reiniciar la captura */}
+            <button
+              className={styles.buttonReset}
+              onClick={() => {
+                handleReset();
+              }}
+            >
+              Reiniciar captura
+            </button>
           </div>
         )}
       </article>
