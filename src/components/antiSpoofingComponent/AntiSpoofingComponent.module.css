@@ -1,7 +1,9 @@
 .section {
   display: flex;
   width: 100%;
-  justify-content: space-evenly;
+  justify-content: space-between;
+  padding-left: 40px;
+  padding-right: 40px;
 }
 
 /* Se requiere el position para que el video y el canvas se superpongan correctamente*/

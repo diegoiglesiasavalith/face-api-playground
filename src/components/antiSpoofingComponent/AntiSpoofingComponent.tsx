@@ -1,13 +1,17 @@
 import * as faceapi from "face-api.js";
 import { useEffect, useRef, useState } from "react";
 import styles from "./AntiSpoofingComponent.module.css";
+import Image from "next/image";
 
 // Variable para almacenar el ID del intervalo
 let intervalId: NodeJS.Timeout;
 
-// Correccion a la orientacion del rostro
+// Corrección a la orientación del rostro
 const correctFaceToTheLeft = 15;
 const correctFaceToTheRight = 15;
+
+// Umbral de detección de la sonrisa (debe estar entre 0 y 1)
+const smileDetectionThreshold = 0.8;
 
 const AntiSpoofingComponent = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -17,6 +21,8 @@ const AntiSpoofingComponent = () => {
   const [hasLookedRight, setHasLookedRight] = useState(false);
   const [hasLookedCenter, setHasLookedCenter] = useState(false);
   const [hasLookedCenterAgain, setHasLookedCenterAgain] = useState(false);
+  const [hasSmiled, setHasSmiled] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string>("");
 
   useEffect(() => {
     const loadModels = async () => {
@@ -24,6 +30,7 @@ const AntiSpoofingComponent = () => {
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
       await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
       setModelsLoaded(true);
     };
 
@@ -77,6 +84,37 @@ const AntiSpoofingComponent = () => {
     }
   };
 
+  const detectSmile = (expressions: faceapi.FaceExpressions) => {
+    if (
+      expressions.happy > smileDetectionThreshold &&
+      hasLookedCenterAgain &&
+      capturedImage === ""
+    ) {
+      setHasSmiled(true);
+      console.log("Sonrisa detectada: ", expressions.happy);
+
+      // Capturar la imagen del video cuando se detecta la sonrisa
+      const video = videoRef.current;
+      if (video) {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = video.videoWidth;
+        tempCanvas.height = video.videoHeight;
+        const context = tempCanvas.getContext("2d");
+        if (context) {
+          context.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+          const base64Image = tempCanvas.toDataURL("image/png");
+          setCapturedImage(base64Image); // Guardar la imagen en base64
+          console.log("Imagen capturada en base64");
+
+          // Limpiar el intervalo después de capturar la imagen
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     if (modelsLoaded && videoRef.current) {
       const video = videoRef.current;
@@ -103,7 +141,8 @@ const AntiSpoofingComponent = () => {
 
             const detections = await faceapi
               .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-              .withFaceLandmarks();
+              .withFaceLandmarks()
+              .withFaceExpressions();
 
             if (detections.length > 0) {
               const resizedDetections = faceapi.resizeResults(
@@ -111,8 +150,10 @@ const AntiSpoofingComponent = () => {
                 displaySize
               );
               const landmarks = resizedDetections[0].landmarks;
+              const expressions = resizedDetections[0].expressions;
 
               detectHeadOrientation(landmarks); // Detectar la orientación de la cabeza
+              detectSmile(expressions); // Detectar sonrisa
 
               faceapi.draw.drawDetections(canvas, resizedDetections);
               faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
@@ -138,6 +179,8 @@ const AntiSpoofingComponent = () => {
     hasLookedLeft,
     hasLookedRight,
     hasLookedCenterAgain,
+    hasSmiled,
+    capturedImage,
   ]);
 
   return (
@@ -149,7 +192,7 @@ const AntiSpoofingComponent = () => {
         <p style={{ color: "white" }}>
           {hasLookedCenter
             ? "Mirada hacia el centro detectada (primer paso)"
-            : "Cargando lanmarkers..."}
+            : "Cargando landmarks..."}
         </p>
         <p style={{ color: "white" }}>
           {hasLookedLeft
@@ -173,13 +216,32 @@ const AntiSpoofingComponent = () => {
             : "..."}
         </p>
         <p style={{ color: "white" }}>
+          {hasSmiled
+            ? "Sonrisa detectada (último paso)"
+            : hasLookedCenterAgain
+            ? "Sonríe para completar la secuencia"
+            : "..."}
+        </p>
+        <p style={{ color: "white" }}>
           {hasLookedCenter &&
           hasLookedLeft &&
           hasLookedRight &&
-          hasLookedCenterAgain
+          hasLookedCenterAgain &&
+          hasSmiled
             ? "Secuencia completada correctamente"
             : "Secuencia incompleta"}
         </p>
+
+        {capturedImage !== "" && (
+          <div>
+            <Image
+              src={capturedImage}
+              alt="Imagen capturada"
+              width={420}
+              height={315}
+            />
+          </div>
+        )}
       </article>
 
       <div className={styles.container}>
