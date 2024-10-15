@@ -6,12 +6,19 @@ import Image from "next/image";
 // Variable para almacenar el ID del intervalo
 let intervalId: NodeJS.Timeout;
 
-// Corrección a la orientación del rostro
+// Corrección a la orientación del rostro (debe estar entre 0 y 25)
 const correctFaceToTheLeft = 15;
 const correctFaceToTheRight = 15;
 
 // Umbral de detección de la sonrisa (debe estar entre 0 y 1)
 const smileDetectionThreshold = 0.8;
+
+// Margen alrededor del rostro detectado en píxeles
+const FACE_MARGIN = 100;
+
+// Ancho y alto deseados para la imagen capturada
+const FINAL_WIDTH = 300;
+const FINAL_HEIGHT = 225;
 
 const AntiSpoofingComponent = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -84,7 +91,13 @@ const AntiSpoofingComponent = () => {
     }
   };
 
-  const detectSmile = (expressions: faceapi.FaceExpressions) => {
+  const detectSmile = (
+    expressions: faceapi.FaceExpressions,
+    detection: faceapi.WithFaceLandmarks<
+      { detection: faceapi.FaceDetection },
+      faceapi.FaceLandmarks68
+    >
+  ) => {
     if (
       expressions.happy > smileDetectionThreshold &&
       hasLookedCenterAgain &&
@@ -97,14 +110,52 @@ const AntiSpoofingComponent = () => {
       const video = videoRef.current;
       if (video) {
         const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = video.videoWidth;
-        tempCanvas.height = video.videoHeight;
         const context = tempCanvas.getContext("2d");
+
         if (context) {
-          context.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-          const base64Image = tempCanvas.toDataURL("image/png");
-          setCapturedImage(base64Image); // Guardar la imagen en base64
-          console.log("Imagen capturada en base64");
+          // Obtenemos las coordenadas del rostro y aplicamos el margen
+          let { x, y, width, height } = detection.detection.box;
+
+          // Ajustamos las coordenadas para incluir el margen
+          x = Math.max(x - FACE_MARGIN, 0);
+          y = Math.max(y - FACE_MARGIN, 0);
+          width = Math.min(width + FACE_MARGIN * 2, video.videoWidth - x);
+          height = Math.min(height + FACE_MARGIN * 2, video.videoHeight - y);
+
+          // Establecemos el tamaño del canvas original al tamaño del área ajustada
+          tempCanvas.width = width;
+          tempCanvas.height = height;
+
+          // Dibujamos solo la región del rostro en el canvas original
+          context.drawImage(video, x, y, width, height, 0, 0, width, height);
+
+          // Crear un nuevo canvas para redimensionar la imagen a 300x225
+          const resizedCanvas = document.createElement("canvas");
+          resizedCanvas.width = FINAL_WIDTH;
+          resizedCanvas.height = FINAL_HEIGHT;
+          const resizedContext = resizedCanvas.getContext("2d");
+
+          if (resizedContext) {
+            // Dibujamos la imagen recortada en el nuevo canvas redimensionado
+            resizedContext.drawImage(
+              tempCanvas,
+              0,
+              0,
+              width,
+              height,
+              0,
+              0,
+              FINAL_WIDTH,
+              FINAL_HEIGHT
+            );
+
+            // Convertimos el canvas redimensionado a una imagen en base64
+            const base64Image = resizedCanvas.toDataURL("image/png");
+            setCapturedImage(base64Image); // Guardar la imagen redimensionada en base64
+            console.log(
+              "Imagen recortada y redimensionada capturada en base64"
+            );
+          }
 
           // Limpiar el intervalo después de capturar la imagen
           if (intervalId) {
@@ -163,7 +214,7 @@ const AntiSpoofingComponent = () => {
               const expressions = resizedDetections[0].expressions;
 
               detectHeadOrientation(landmarks); // Detectar la orientación de la cabeza
-              detectSmile(expressions); // Detectar sonrisa
+              detectSmile(expressions, resizedDetections[0]); // Detectar sonrisa y capturar rostro
 
               faceapi.draw.drawDetections(canvas, resizedDetections);
               faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
@@ -248,8 +299,8 @@ const AntiSpoofingComponent = () => {
               <Image
                 src={capturedImage}
                 alt="Imagen capturada"
-                width={420}
-                height={315}
+                width={FINAL_WIDTH}
+                height={FINAL_HEIGHT}
               />
             ) : (
               <div className={styles.imageContainerError}>
