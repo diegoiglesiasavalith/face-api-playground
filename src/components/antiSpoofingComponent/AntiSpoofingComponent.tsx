@@ -20,6 +20,9 @@ const FACE_MARGIN = 100;
 const FINAL_WIDTH = 300;
 const FINAL_HEIGHT = 225;
 
+// Cantidad mínima de mediciones para validar
+const MIN_MEASUREMENTS = 10;
+
 const AntiSpoofingComponent = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -44,7 +47,11 @@ const AntiSpoofingComponent = () => {
     loadModels();
   }, []);
 
-  const detectHeadOrientation = (landmarks: faceapi.FaceLandmarks68) => {
+  const detectHeadOrientation = (
+    landmarks: faceapi.FaceLandmarks68,
+    rightEyePositions: number[],
+    leftEyePositions: number[]
+  ) => {
     const nose = landmarks.getNose();
     const leftEye = landmarks.getLeftEye();
     const rightEye = landmarks.getRightEye();
@@ -59,11 +66,53 @@ const AntiSpoofingComponent = () => {
       console.log("Mirada hacia el centro detectada (primer paso)");
     }
 
+    // Guardar las mediciones actuales en los arrays de las posiciones de los ojos
+    leftEyePositions.push(leftEye[0].x);
+    const leftEyePositionsLastData = leftEyePositions.slice(-MIN_MEASUREMENTS);
+
+    rightEyePositions.push(rightEye[3].x);
+    const rightEyePositionsLastData = rightEyePositions.slice(
+      -MIN_MEASUREMENTS
+    );
+
+    // Verificar la consistencia del movimiento hacia la izquierda (valores en X del ojo derecho deberían aumentar)
+    const isLookingLeftConsistentArray = rightEyePositionsLastData.map(
+      (value: number, index: number, array: number[]) => {
+        return value > array[index - 1];
+      }
+    );
+
+    const isLookingLeftConsistentArrayOfPositivesCases =
+      isLookingLeftConsistentArray.filter((value: boolean) => {
+        return value;
+      });
+
+    const isLookingLeftConsistent =
+      isLookingLeftConsistentArrayOfPositivesCases.length >
+      MIN_MEASUREMENTS - 2;
+
+    // Verificar la consistencia del movimiento hacia la derecha (valores en X del ojo izquierdo deberían disminuir)
+    const isLookingRightConsistentArray = leftEyePositionsLastData.map(
+      (value: number, index: number, array: number[]) => {
+        return value < array[index - 1];
+      }
+    );
+
+    const isLookingRightConsistentArrayOfPositivesCases =
+      isLookingRightConsistentArray.filter((value: boolean) => {
+        return value;
+      });
+
+    const isLookingRightConsistent =
+      isLookingRightConsistentArrayOfPositivesCases.length >
+      MIN_MEASUREMENTS - 2;
+
     // Detectar si está mirando hacia la izquierda (después de mirar al centro)
     if (
       hasLookedCenter &&
       !hasLookedLeft &&
-      nose[0].x + correctFaceToTheLeft > rightEye[3].x
+      nose[0].x + correctFaceToTheLeft > rightEye[3].x &&
+      isLookingLeftConsistent
     ) {
       setHasLookedLeft(true);
       console.log("Mirada hacia la izquierda detectada");
@@ -73,7 +122,8 @@ const AntiSpoofingComponent = () => {
     if (
       hasLookedLeft &&
       !hasLookedRight &&
-      nose[0].x - correctFaceToTheRight < leftEye[0].x
+      nose[0].x - correctFaceToTheRight < leftEye[0].x &&
+      isLookingRightConsistent
     ) {
       setHasLookedRight(true);
       console.log("Mirada hacia la derecha detectada");
@@ -195,6 +245,9 @@ const AntiSpoofingComponent = () => {
             clearInterval(intervalId);
           }
 
+          let rightEyePositions: number[] = [];
+          let leftEyePositions: number[] = [];
+
           // Iniciar un nuevo intervalo
           intervalId = setInterval(async () => {
             const context = canvas.getContext("2d");
@@ -213,7 +266,11 @@ const AntiSpoofingComponent = () => {
               const landmarks = resizedDetections[0].landmarks;
               const expressions = resizedDetections[0].expressions;
 
-              detectHeadOrientation(landmarks); // Detectar la orientación de la cabeza
+              detectHeadOrientation(
+                landmarks,
+                rightEyePositions,
+                leftEyePositions
+              ); // Detectar la orientación de la cabeza
               detectSmile(expressions, resizedDetections[0]); // Detectar sonrisa y capturar rostro
 
               faceapi.draw.drawDetections(canvas, resizedDetections);
