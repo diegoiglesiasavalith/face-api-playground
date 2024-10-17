@@ -26,13 +26,18 @@ const MIN_MEASUREMENTS = 10;
 const AntiSpoofingComponent = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [hasLookedLeft, setHasLookedLeft] = useState(false);
-  const [hasLookedRight, setHasLookedRight] = useState(false);
-  const [hasLookedCenter, setHasLookedCenter] = useState(false);
-  const [hasLookedCenterAgain, setHasLookedCenterAgain] = useState(false);
-  const [hasSmiled, setHasSmiled] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState<boolean>(false);
+  const [hasLookedLeft, setHasLookedLeft] = useState<boolean>(false);
+  const [hasLookedRight, setHasLookedRight] = useState<boolean>(false);
+  const [hasLookedCenter, setHasLookedCenter] = useState<boolean>(false);
+  const [hasLookedCenterAgain, setHasLookedCenterAgain] =
+    useState<boolean>(false);
+  const [hasSmiled, setHasSmiled] = useState<boolean>(false);
   const [capturedImage, setCapturedImage] = useState<string>("");
+  const [isNecesaryLookToTheLeft, setIsNecesaryLookToTheLeft] =
+    useState<boolean>(true);
+  const [isNecesaryLookToTheRight, setIsNecesaryLookToTheRight] =
+    useState<boolean>(true);
 
   useEffect(() => {
     const loadModels = async () => {
@@ -43,6 +48,9 @@ const AntiSpoofingComponent = () => {
       await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
       setModelsLoaded(true);
     };
+
+    setIsNecesaryLookToTheLeft(Math.random() > 0.5);
+    setIsNecesaryLookToTheRight(Math.random() > 0.5);
 
     loadModels();
   }, []);
@@ -109,10 +117,11 @@ const AntiSpoofingComponent = () => {
 
     // Detectar si está mirando hacia la izquierda (después de mirar al centro)
     if (
-      hasLookedCenter &&
-      !hasLookedLeft &&
-      nose[0].x + correctFaceToTheLeft > rightEye[3].x &&
-      isLookingLeftConsistent
+      (hasLookedCenter &&
+        !hasLookedLeft &&
+        nose[0].x + correctFaceToTheLeft > rightEye[3].x &&
+        isLookingLeftConsistent) ||
+      (!isNecesaryLookToTheLeft && !hasLookedLeft)
     ) {
       setHasLookedLeft(true);
       console.log("Mirada hacia la izquierda detectada");
@@ -120,10 +129,11 @@ const AntiSpoofingComponent = () => {
 
     // Detectar si está mirando hacia la derecha (después de mirar a la izquierda)
     if (
-      hasLookedLeft &&
-      !hasLookedRight &&
-      nose[0].x - correctFaceToTheRight < leftEye[0].x &&
-      isLookingRightConsistent
+      (hasLookedLeft &&
+        !hasLookedRight &&
+        nose[0].x - correctFaceToTheRight < leftEye[0].x &&
+        isLookingRightConsistent) ||
+      (!isNecesaryLookToTheRight && !hasLookedRight)
     ) {
       setHasLookedRight(true);
       console.log("Mirada hacia la derecha detectada");
@@ -150,6 +160,8 @@ const AntiSpoofingComponent = () => {
   ) => {
     if (
       expressions.happy > smileDetectionThreshold &&
+      hasLookedLeft &&
+      hasLookedRight &&
       hasLookedCenterAgain &&
       capturedImage === ""
     ) {
@@ -352,7 +364,7 @@ const AntiSpoofingComponent = () => {
 
         {capturedImage !== "" && (
           <div className={styles.imageContainer}>
-            {capturedImage.length > 10 ? (
+            {capturedImage.length > 50 ? (
               <Image
                 src={capturedImage}
                 alt="Imagen capturada"
